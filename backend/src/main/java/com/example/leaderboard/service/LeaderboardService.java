@@ -6,10 +6,12 @@ import com.example.leaderboard.dto.ScoreSubmissionRequest;
 import com.example.leaderboard.dto.ScoreSubmissionResponse;
 import com.example.leaderboard.exception.ResourceNotFoundException;
 import com.example.leaderboard.model.LeaderboardEntry;
-import com.example.leaderboard.repository.LeaderboardEntryRepository;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -17,7 +19,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentSkipListSet;
@@ -27,27 +28,26 @@ public class LeaderboardService {
 
     private static final Logger logger = LoggerFactory.getLogger(LeaderboardService.class);
 
-    private final LeaderboardEntryRepository repository;
+    private final MongoTemplate mongoTemplate;
 
     private final ConcurrentMap<String, Integer> scoreByPlayer = new ConcurrentHashMap<>();
 
-    private final ConcurrentSkipListSet<PlayerScore> rankingSet =
-            new ConcurrentSkipListSet<>(Comparator
-                    .comparingInt(PlayerScore::score).reversed()
-                    .thenComparing(PlayerScore::playerId));
+    private final ConcurrentSkipListSet<PlayerScore> rankingSet = new ConcurrentSkipListSet<>(Comparator
+            .comparingInt(PlayerScore::score).reversed()
+            .thenComparing(PlayerScore::playerId));
 
     private final Object rankingLock = new Object();
 
     private volatile boolean mongoAvailable = true;
 
-    public LeaderboardService(LeaderboardEntryRepository repository) {
-        this.repository = repository;
+    public LeaderboardService(MongoTemplate mongoTemplate) {
+        this.mongoTemplate = mongoTemplate;
     }
 
     @PostConstruct
     public void warmUpFromMongo() {
         try {
-            List<LeaderboardEntry> all = repository.findAll();
+            List<LeaderboardEntry> all = mongoTemplate.findAll(LeaderboardEntry.class);
             synchronized (rankingLock) {
                 for (LeaderboardEntry entry : all) {
                     PlayerScore playerScore = new PlayerScore(entry.getPlayerId(), entry.getScore());
@@ -59,7 +59,8 @@ public class LeaderboardService {
             logger.info("Leaderboard cache warmed with {} players from MongoDB", all.size());
         } catch (Exception exception) {
             mongoAvailable = false;
-            logger.warn("MongoDB unavailable during startup; running with in-memory leaderboard only: {}", exception.getMessage());
+            logger.warn("MongoDB unavailable during startup; running with in-memory leaderboard only: {}",
+                    exception.getMessage());
         }
     }
 
@@ -83,7 +84,7 @@ public class LeaderboardService {
                 rankingSet.add(new PlayerScore(playerId, submittedScore));
                 finalScore = submittedScore;
             } else {
-                finalScore = existingScore;
+                finalScore = Objects.requireNonNull(existingScore);
             }
 
             rank = calculateRankLocked(playerId);
@@ -156,12 +157,15 @@ public class LeaderboardService {
 
     private void persistHighScoreSafely(String playerId, int score) {
         try {
-            Optional<LeaderboardEntry> optionalEntry = repository.findByPlayerId(playerId);
-            LeaderboardEntry entry = optionalEntry.orElseGet(LeaderboardEntry::new);
+            Query query = Query.query(Criteria.where("playerId").is(playerId));
+            LeaderboardEntry entry = mongoTemplate.findOne(query, LeaderboardEntry.class);
+            if (entry == null) {
+                entry = new LeaderboardEntry();
+            }
             entry.setPlayerId(playerId);
             entry.setScore(score);
             entry.setUpdatedAt(Instant.now());
-            repository.save(entry);
+            mongoTemplate.save(entry);
         } catch (Exception exception) {
             mongoAvailable = false;
             logger.warn("Failed to persist score for player {}: {}", playerId, exception.getMessage());
