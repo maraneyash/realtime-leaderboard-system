@@ -1,5 +1,6 @@
 # Maven
 /target/
+/backend/target/
 !.mvn/wrapper/maven-wrapper.jar
 
 # Maven local tooling folder used in this repo
@@ -29,3 +30,7 @@ logs/
 
 # Java
 *.class
+
+# Frontend
+/frontend/node_modules/
+/frontend/dist/

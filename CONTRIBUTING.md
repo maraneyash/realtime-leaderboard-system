@@ -5,11 +5,18 @@ Thanks for contributing to this project.
 ## Development Setup
 
 1. Start MongoDB:
+   - `cd backend`
    - `docker compose up -d`
 2. Build project:
-   - `.\\tools\\apache-maven-3.9.9\\bin\\mvn.cmd clean package`
+   - `cd backend`
+   - `..\\tools\\apache-maven-3.9.9\\bin\\mvn.cmd clean package`
 3. Run app:
+   - `cd backend`
    - `java -jar .\\target\\realtime-leaderboard-system-1.0.0.jar`
+4. Run frontend:
+   - `cd frontend`
+   - `npm install`
+   - `npm run dev`
 
 ## Pull Request Guidelines
 
