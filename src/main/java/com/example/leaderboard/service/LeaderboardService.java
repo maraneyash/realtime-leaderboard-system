@@ -38,6 +38,8 @@ public class LeaderboardService {
 
     private final Object rankingLock = new Object();
 
+    private volatile boolean mongoAvailable = true;
+
     public LeaderboardService(LeaderboardEntryRepository repository) {
         this.repository = repository;
     }
@@ -53,8 +55,10 @@ public class LeaderboardService {
                     rankingSet.add(playerScore);
                 }
             }
+            mongoAvailable = true;
             logger.info("Leaderboard cache warmed with {} players from MongoDB", all.size());
         } catch (Exception exception) {
+            mongoAvailable = false;
             logger.warn("MongoDB unavailable during startup; running with in-memory leaderboard only: {}", exception.getMessage());
         }
     }
@@ -85,7 +89,7 @@ public class LeaderboardService {
             rank = calculateRankLocked(playerId);
         }
 
-        if (updated) {
+        if (updated && mongoAvailable) {
             persistHighScoreSafely(playerId, finalScore);
         }
 
@@ -159,6 +163,7 @@ public class LeaderboardService {
             entry.setUpdatedAt(Instant.now());
             repository.save(entry);
         } catch (Exception exception) {
+            mongoAvailable = false;
             logger.warn("Failed to persist score for player {}: {}", playerId, exception.getMessage());
         }
     }

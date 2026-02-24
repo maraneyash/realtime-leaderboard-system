@@ -3,13 +3,16 @@ spring:
     name: realtime-leaderboard-system
   data:
     mongodb:
-      uri: ${MONGODB_URI:mongodb://localhost:27017/leaderboarddb}
-      auto-index-creation: true
+      uri: ${MONGODB_URI:mongodb://localhost:27017/leaderboarddb?connectTimeoutMS=1000&serverSelectionTimeoutMS=1000&socketTimeoutMS=1000}
+      auto-index-creation: false
 
 server:
   port: ${PORT:8080}
 
 management:
+  health:
+    mongo:
+      enabled: false
   endpoints:
     web:
       exposure:

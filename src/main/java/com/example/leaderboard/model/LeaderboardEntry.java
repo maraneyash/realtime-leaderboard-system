@@ -1,10 +1,10 @@
 package com.example.leaderboard.model;
 
+import java.time.Instant;
+
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
-
-import java.time.Instant;
 
 @Document(collection = "leaderboard_entries")
 public class LeaderboardEntry {
